@@ -3,8 +3,164 @@ from tkinter import ttk
 from storage import load_tasks, save_tasks
 from datetime import datetime, date
 from tkcalendar import Calendar
+import json
+import os
+
+# ================= SETTINGS =================
+SETTINGS_FILE = "settings.json"
+
+def load_settings():
+    if not os.path.exists(SETTINGS_FILE):
+        return {"theme": "light"}
+
+    try:
+        with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {"theme": "light"}
+
+
+def save_settings():
+    with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
+        json.dump(
+            {"theme": current_theme},
+            f,
+            ensure_ascii=False,
+            indent=2
+        )
+
+# ================= THEME =================
+THEMES = {
+    "light": {
+        "bg": "#f5f5f5",
+        "fg": "#000000",
+
+        "entry_bg": "#ffffff",
+
+        "button_bg": "#e0e0e0",
+        "button_hover": "#d0d0d0",
+        "button_fg": "#000000",
+
+        "tree_bg": "#ffffff",
+        "tree_fg": "#000000"
+    },
+
+    "dark": {
+        "bg": "#2b2b2b",
+        "fg": "#ffffff",
+
+        "entry_bg": "#3a3a3a",
+
+        "button_bg": "#3a3a3a",
+        "button_hover": "#2f2f2f",
+        "button_fg": "#ffffff",
+
+        "tree_bg": "#3f3f3f",
+        "tree_fg": "#ffffff"
+    }
+}
+
+settings = load_settings()
+current_theme = settings.get("theme", "light")
 
 # ================= LOGIC =================
+def apply_theme():
+    theme = THEMES[current_theme]
+
+    root.configure(bg=theme["bg"])
+
+    entry.configure(bg=theme["entry_bg"], fg=theme["fg"])
+    deadline_entry.configure(readonlybackground=theme["entry_bg"], fg=theme["fg"])
+
+    no_deadline_check.configure(bg=theme["bg"], fg=theme["fg"])
+
+    style = ttk.Style()
+    style.theme_use("clam")
+
+    # Treeview
+    style.configure(
+        "Treeview",
+        background=theme["tree_bg"],
+        foreground=theme["tree_fg"],
+        fieldbackground=theme["tree_bg"]
+    )
+
+    style.map(
+        "Treeview",
+        background=[("selected", "#6a9fb5")],
+        foreground=[("selected", "#ffffff")]
+    )
+    style.configure(
+        "Treeview.Heading",
+        background=theme["button_bg"],
+        foreground=theme["tree_fg"],
+        relief="flat"
+    )
+
+    style.map(
+        "Treeview.Heading",
+        background=[
+            ("active", theme["button_hover"])
+        ]
+    )
+
+    for widget in root.winfo_children():
+        if isinstance(widget, tk.Button):
+            widget.configure(
+                bg=theme["button_bg"],
+                fg=theme["button_fg"],
+                activebackground=theme["button_hover"],
+                activeforeground=theme["button_fg"],
+                relief="flat",
+                bd=0,
+                highlightthickness=0,
+                highlightbackground=theme["bg"]
+            )
+
+def on_button_enter(event):
+    theme = THEMES[current_theme]
+    event.widget.configure(bg=theme["button_hover"])
+
+
+def on_button_leave(event):
+    theme = THEMES[current_theme]
+    event.widget.configure(bg=theme["button_bg"])
+
+def open_settings():
+    settings = tk.Toplevel(root)
+    settings.title("Настройки")
+    settings.geometry("250x150")
+    settings.resizable(False, False)
+
+    var = tk.StringVar(value=current_theme)
+
+    def change_theme():
+        global current_theme
+        current_theme = var.get()
+        apply_theme()
+        save_settings()
+
+    tk.Label(
+        settings,
+        text="Тема оформления"
+    ).pack(pady=10)
+
+    tk.Radiobutton(
+        settings,
+        text="Светлая",
+        variable=var,
+        value="light",
+        command=change_theme
+    ).pack(anchor="w", padx=20)
+
+    tk.Radiobutton(
+        settings,
+        text="Тёмная",
+        variable=var,
+        value="dark",
+        command=change_theme
+    ).pack(anchor="w", padx=20)
+
 def on_date_selected(event):
     root.focus_set()
 
@@ -145,19 +301,14 @@ no_deadline_check = tk.Checkbutton(
 )
 no_deadline_check.pack()
 
-
-calendar_button = tk.Button(
-    root,
-    text="📅 Выбрать дедлайн",
-    command=open_calendar
-)
+calendar_button = ttk.Button(root, text="📅 Выбрать дедлайн", command=open_calendar)
 calendar_button.pack(pady=2)
-
-add_button = tk.Button(root, text="Add", command=add_task)
-delete_button = tk.Button(root, text="Delete", command=delete_task)
-
+add_button = ttk.Button(root, text="Add", command=add_task)
 add_button.pack(pady=2)
+delete_button = ttk.Button(root, text="Delete", command=delete_task)
 delete_button.pack(pady=2)
+settings_button = ttk.Button(root, text="⚙ Настройки", command=open_settings)
+settings_button.pack(pady=5)
 
 tree = ttk.Treeview(
     root,
@@ -181,4 +332,5 @@ deadline_entry.bind("<<DateEntrySelected>>", on_date_selected)
 deadline_entry.bind("<Key>", block_typing)
 
 load_all_tasks()
+apply_theme()
 root.mainloop()
